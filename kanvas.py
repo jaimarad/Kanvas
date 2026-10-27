@@ -2439,7 +2439,8 @@ def cmd_serve(args):
         if not args.no_open:
             webbrowser.open(board_url)
         return
-    server = start_server(path, args.host, args.port, remember=state_file() if local else None)
+    # Fork: a container serves on 0.0.0.0 with --saved, and must still remember its boards across restarts.
+    server = start_server(path, args.host, args.port, remember=state_file() if local or args.saved else None)
     if args.tailscale:
         try:
             server.open_to_phone()

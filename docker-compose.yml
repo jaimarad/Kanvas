@@ -1,0 +1,22 @@
+# Local development: the working copy is mounted at /opt/kanvas, so edits apply on the next restart.
+#   docker compose up -d --build                 # the board at http://127.0.0.1:8865/
+#   docker compose exec -w /workspace/<project> kanvas kanvas serve   # open a project's board in it
+#   docker compose exec kanvas claude          # log in to Claude Code once
+#   docker compose exec kanvas gh auth login   # log in to GitHub once
+#   docker compose exec kanvas python3 -m unittest discover -s /opt/kanvas/tests
+services:
+  kanvas:
+    build: .
+    volumes:
+      - .:/opt/kanvas
+      - workspace:/workspace
+      - auth:/home/kanvas/auth
+    ports:
+      # 8865 on the host, so it does not clash with a Kanvas running natively on 8765.
+      - "127.0.0.1:8865:8765"
+    init: false
+    restart: unless-stopped
+
+volumes:
+  workspace:
+  auth:

@@ -2,6 +2,17 @@
 
 Kanvas is a task board shared by humans and AI agents. This file is for agents and contributors changing Kanvas itself. The instructions Kanvas gives to agents in other projects live in `skill/SKILL.md`.
 
+## This fork: agents run from the board
+
+`jaimarad/Kanvas` adds agents that Kanvas launches itself, so the board needs no terminal: **Validate** (refine a task with you in a terminal in the browser, then approve it), **Run** (the executor works on branch `kanvas/<ID>` in its own worktree and opens a PR) and **Review** (the reviewer reviews the PR, then marks the task done, merging it in Auto-merge mode, or requests changes and sends the task back to be validated again). Each agent has its own prompt in `.kanvas/agents/<role>.md` in the project.
+
+It deliberately departs from the upstream rules below, and only in these ways:
+
+- **Agent features are Linux-first.** They need a POSIX pty and the `git`, `gh` and `claude` commands, and they are developed and tested in Docker (`docker-compose.yml`) and deployed on a Linux VPS reached over Tailscale. Everything else keeps working on Windows and macOS without them.
+- **The `validator` and `reviewer` roles may approve and mark done.** Other agents keep the upstream workflow.
+- **Keep upstream merges easy.** New server-side code goes in its own module rather than spread through `kanvas.py`; in `kanvas.html`, keep additions in their own sections. Third-party browser code (xterm.js) is vendored and served by Kanvas, never loaded from the network.
+- Work happens on the `jaime` branch; `main` tracks `upstream/main`.
+
 ## Layout
 
 | Path | What it is |
