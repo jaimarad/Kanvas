@@ -20,6 +20,10 @@ It deliberately departs from the upstream rules below, and only in these ways:
 | `kanvas.py` | CLI, board model, local server, `init` / `import` / `export`. Python 3.8+, standard library only |
 | `kanvas.html` | The whole browser board in one file: CSS, markup and JavaScript, no build step |
 | `skill/SKILL.md` | Agent skill that `init` installs into projects |
+| `kanvas_agents.py` | Fork: terminal sessions in a pty, their HTTP routes and the WebSocket the browser attaches with. Loaded by `kanvas.py` on POSIX only (`AGENTS`) |
+| `vendor/` | Fork: xterm.js, served at `/api/vendor/<name>`; versions in `vendor/README.md` |
+| `tests/test_agents.py` | Fork: tests for `kanvas_agents.py`; they skip without a pty, so run them in Docker |
+| `Dockerfile`, `docker-compose.yml` | Fork: the Linux environment for developing and deploying the agent features |
 | `examples/sample.json` | Demo board, also used by the tests |
 | `examples/drone.json` | The board in the README, its screenshots and the skill's examples |
 | `tests/test_kanvas.py` | Test suite (`unittest`) |
