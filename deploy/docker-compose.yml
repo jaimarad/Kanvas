@@ -1,0 +1,41 @@
+# Kanvas with agents on a Linux VPS, reachable only over Tailscale. See FORK.md, "Deploy on a VPS".
+#   cp deploy/.env.example deploy/.env      # then put your Tailscale auth key in it
+#   docker compose -f deploy/docker-compose.yml up -d --build
+#
+# No port is published: the board is at https://<TS_HOSTNAME>.<your tailnet>.ts.net/, served by
+# `tailscale serve` with a certificate, and nothing else can reach it.
+services:
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: ${TS_HOSTNAME:-kanvas}
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:?Put a Tailscale auth key in deploy/.env}
+      - TS_HOSTNAME=${TS_HOSTNAME:-kanvas}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=true
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - tailscale:/var/lib/tailscale
+      - ./serve.json:/config/serve.json:ro
+    restart: unless-stopped
+
+  kanvas:
+    build: ..
+    # Shares the Tailscale container's network: Kanvas listens there, and only `tailscale serve` passes requests on.
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
+    environment:
+      - GIT_AUTHOR_NAME=${GIT_NAME:-Kanvas agent}
+      - GIT_AUTHOR_EMAIL=${GIT_EMAIL:-kanvas@localhost}
+      - GIT_COMMITTER_NAME=${GIT_NAME:-Kanvas agent}
+      - GIT_COMMITTER_EMAIL=${GIT_EMAIL:-kanvas@localhost}
+    volumes:
+      - workspace:/workspace
+      - auth:/home/kanvas/auth
+    restart: unless-stopped
+
+volumes:
+  tailscale:
+  workspace:
+  auth:

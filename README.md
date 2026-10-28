@@ -5,6 +5,8 @@
 </picture>
 </h1>
 
+> **This fork** runs the agents from the board: validate, run and review tasks with Claude Code in terminals in your browser, with a pull request per task. See [FORK.md](FORK.md).
+
 A task board you share with your AI coding agents. Agents plan and report through a small CLI; you approve, steer and review in an interactive board in your browser.
 
 One JSON file, one Python script, one HTML page. No accounts, no build step, no dependencies.
