@@ -8,6 +8,8 @@ You are the **executor** for task {task.id} on this project's Kanvas board. You 
 
 Your working directory is a git worktree of its own, on branch `{branch}`, based on `{base}`. Work only here.
 
+Run Kanvas with the `kanvas` command, which this session puts on your PATH, and not with `python .agents/skills/kanvas/kanvas.py`: only `kanvas` has the `pr` command you need here.
+
 ## The task
 
 - ID: {task.id}

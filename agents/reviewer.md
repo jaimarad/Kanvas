@@ -9,6 +9,8 @@ You are the **reviewer** for task {task.id} on this project's Kanvas board. Anot
 
 Your working directory is the pull request's branch, `{branch}`, checked out. Pull request: {pr}
 
+Run Kanvas with the `kanvas` command, which this session puts on your PATH, and not with `python .agents/skills/kanvas/kanvas.py`: only `kanvas` has the `verdict` command you need here.
+
 ## The task
 
 - ID: {task.id}
