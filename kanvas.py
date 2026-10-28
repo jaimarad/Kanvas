@@ -59,6 +59,22 @@ STALE_LOCK_AGE = 5.0
 MAX_UPLOAD = 20 * 1024 * 1024
 
 
+def _load_agents():
+    """Fork: the terminal sessions and agents in kanvas_agents.py next to this file, where there is a POSIX pty."""
+    path = os.path.join(HERE, "kanvas_agents.py")
+    if os.name != "posix" or not os.path.isfile(path):
+        return None
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("kanvas_agents", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.K = sys.modules[__name__]
+    return module
+
+
+AGENTS = _load_agents()
+
+
 class KanvasError(Exception):
     pass
 
@@ -1889,6 +1905,7 @@ class BoardServer(ThreadingHTTPServer):
         self.phone_lock = threading.Lock()
         self.boards = share.boards if share else {}  # name -> path, in the order the boards were opened
         self.boards_lock = share.boards_lock if share else threading.Lock()
+        self.sessions = share.sessions if share else (AGENTS.Sessions() if AGENTS else None)
         if path:
             self.add_board(path)
 
@@ -1951,6 +1968,8 @@ class BoardServer(ThreadingHTTPServer):
 
     def server_close(self):
         self._stop_phone()
+        if getattr(self, "sessions", None) and self.opens_boards:
+            self.sessions.stop_all()
         super().server_close()
 
     def server_bind(self):
@@ -2127,8 +2146,11 @@ class BoardHandler(BaseHTTPRequestHandler):
                 body += "<p><small>Run <code>kanvas serve</code> in a project to open its board here.</small></p>"
             return self._send(200, page("Kanvas", body), "text/html; charset=utf-8")
         if parts == ["api", "boards"]:
-            info = {"kanvas": VERSION, "boards": self._board_list()}
+            # Fork: "agents" tells the page whether this Kanvas runs terminal sessions and agents.
+            info = {"kanvas": VERSION, "boards": self._board_list(), "agents": bool(self.server.sessions)}
             return self._send(200, json.dumps(info, ensure_ascii=False).encode("utf-8"))
+        if AGENTS and len(parts) == 3 and parts[:2] == ["api", "vendor"]:
+            return AGENTS.handle_vendor(self, parts[2])
         name, rest = parts[0], parts[1:]
         path = self.server.board_path(name)
         if path is None:
@@ -2141,6 +2163,8 @@ class BoardHandler(BaseHTTPRequestHandler):
             return self._redirect(f"/{quote(name)}/")
         if rest == ["api", "phone"]:
             return self._phone(name)
+        if rest[:2] == ["api", "sessions"] and self.server.sessions:
+            return AGENTS.handle(self, "GET", path, rest[2:], self.server.sessions)
         if rest in ([""], ["index.html"]):
             try:
                 with open(HTML_FILE, "rb") as f:
@@ -2185,6 +2209,8 @@ class BoardHandler(BaseHTTPRequestHandler):
             if fresh and not self.server.quiet:
                 print(f"[{time.strftime('%H:%M:%S')}] opened to phones on Tailscale: {'  or  '.join(urls)}", flush=True)
             return self._phone(parts[0])
+        if parts[1:3] == ["api", "sessions"] and self.server.sessions and self.server.board_path(parts[0]) is not None:
+            return AGENTS.handle(self, "POST", self.server.board_path(parts[0]), parts[3:], self.server.sessions)
         if parts != ["api", "boards"]:
             return self._error(404, "Not found")
         if not self._may_manage():
@@ -2211,10 +2237,15 @@ class BoardHandler(BaseHTTPRequestHandler):
         self._send(200, json.dumps(info, ensure_ascii=False).encode("utf-8"))
 
     def do_DELETE(self):
-        """Closes Kanvas to phones again."""
+        """Closes Kanvas to phones again, or stops a terminal session."""
         if not self._host_allowed():
             return self._error(403, "Host not allowed")
         parts = self._route()
+        if parts[1:3] == ["api", "sessions"] and self.server.sessions and self.server.board_path(parts[0]) is not None:
+            # Requiring JSON forces a CORS preflight, so other sites cannot stop sessions.
+            if not (self.headers.get("Content-Type") or "").startswith("application/json"):
+                return self._error(415, "Expected application/json")
+            return AGENTS.handle(self, "DELETE", self.server.board_path(parts[0]), parts[3:], self.server.sessions)
         if parts[1:] != ["api", "phone"] or self.server.board_path(parts[0]) is None:
             return self._error(404, "Not found")
         if not self._may_manage():
@@ -2439,7 +2470,8 @@ def cmd_serve(args):
         if not args.no_open:
             webbrowser.open(board_url)
         return
-    server = start_server(path, args.host, args.port, remember=state_file() if local else None)
+    # Fork: a container serves on 0.0.0.0 with --saved, and must still remember its boards across restarts.
+    server = start_server(path, args.host, args.port, remember=state_file() if local or args.saved else None)
     if args.tailscale:
         try:
             server.open_to_phone()
@@ -2779,6 +2811,8 @@ def build_parser():
     p.add_argument("--force", action="store_true", help="replace an existing board that has tasks")
     p = add("export", cmd_export, "write a read-only HTML snapshot to share")
     p.add_argument("output", nargs="?", default="kanvas-snapshot.html")
+    if AGENTS:  # Fork: validate, pr and verdict, for the agents the board starts.
+        AGENTS.add_commands(add, text_sources)
     return parser
 
 

@@ -802,6 +802,48 @@ dialog.dlg[open]:has(> form > .help) { display: flex; flex-direction: column; }
   .multi-bar .hint { display: none; }
   .multi-bar .count { flex: 1; }
 }
+
+/* ===== Fork: terminal sessions (kanvas_agents.py) ===== */
+.sessions { display: flex; flex-direction: column; gap: 2px; }
+.sess-row { display: flex; align-items: center; gap: 6px; }
+.sess-row .sess-open { flex: 1; justify-content: flex-start; gap: 8px; min-width: 0; text-align: left; }
+.sess-row .sess-open .hint { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-row.open .sess-open { background: var(--surface-2); }
+.sess-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--blocked); }
+.sess-dot.on { background: var(--done); box-shadow: 0 0 0 3px color-mix(in srgb, var(--done) 22%, transparent); }
+.agent-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.agent-actions button { flex: 1; justify-content: center; }
+.agent-line { display: flex; align-items: center; gap: 10px; min-height: 28px; font-size: 13px; }
+.agent-line .rel-label { flex: none; width: 92px; margin: 0; }
+.agent-line a { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+.agent-flag { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 6px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--review) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--review) 40%, var(--border)); }
+.agent-flag span { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 3px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.agent-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); white-space: nowrap; }
+.agent-tag .icon svg { width: 11px; height: 11px; }
+.agent-tag.live { color: var(--doing); border-color: color-mix(in srgb, var(--doing) 50%, var(--border)); animation: agent-pulse 1.6s ease-in-out infinite; }
+.agent-tag.warn { color: var(--review); border-color: color-mix(in srgb, var(--review) 50%, var(--border)); }
+@keyframes agent-pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .agent-tag.live { animation: none; } }
+#term-dock { --term-bg: #0d0f14; position: fixed; left: 0; right: 0; bottom: 0; height: var(--term-h, 45vh); min-height: 140px; max-height: calc(100dvh - 48px);
+  z-index: 20; display: flex; flex-direction: column; background: var(--term-bg); border-top: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
+#term-dock[hidden] { display: none; }
+/* The panel scrolls clear of the dock, so its notes stay reachable. */
+body.term-open #panel { padding-bottom: var(--term-h, 45vh); }
+.term-grip { flex: none; height: 6px; margin-bottom: -6px; position: relative; z-index: 1; cursor: ns-resize; touch-action: none; }
+.term-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 4px 6px 4px 12px; background: var(--surface); border-bottom: 1px solid var(--border); font-size: 13px; }
+.term-bar .term-title { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.term-bar .term-title .hint { color: var(--faint); }
+.term-screen { flex: 1; min-height: 0; padding: 6px 0 2px 8px; }
+.term-screen .xterm { height: 100%; }
+@media (max-width: 700px) {
+  #term-dock { top: 0; height: auto; max-height: none; padding-bottom: env(safe-area-inset-bottom); }
+  .term-grip { display: none; }
+}
 </style>
 </head>
 <body>
@@ -2819,7 +2861,7 @@ function fillCard(el, t) {
   el.setAttribute("role", "option");
   el.setAttribute("aria-label", cardLabel(t, vs, unmet(t)));
   el.replaceChildren(...compact(
-    h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, yoloTag(t), h("span", { class: "badge" }, asking ? "Waiting for you" : LABEL[vs]))),
+    h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, agentTag(t), yoloTag(t), h("span", { class: "badge" }, asking ? "Waiting for you" : LABEL[vs]))),
     h("div", { class: "card-title", title: t.title }, t.title),
     cardFoot(t),
     store.readOnly ? null : h("div", { class: "handle in", title: "Drag onto another card: this card will depend on that one" }),
@@ -3597,7 +3639,7 @@ function kanbanCard(t) {
     role: "option", "aria-label": cardLabel(t, vs, unmet(t)),
     onclick: (e) => (picking ? pickToggle(t.id) : multiClick(e) ? toggleMulti(t.id) : select(t.id)),
   },
-  h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, yoloTag(t),
+  h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, agentTag(t), yoloTag(t),
     asking ? h("span", { class: "badge" }, "Waiting for you") : null,
     g ? h("span", { class: "gchip", title: g.name }, groupTag(groupColor(g)), h("span", {}, g.name)) : null)),
   h("div", { class: "card-title" }, t.title),
@@ -3978,6 +4020,7 @@ function fillPanel(panel, t) {
           t.deps.length ? [h("div", { class: "rel-label" }, "Blocked by"), t.deps.map((d) => depRow(d, () => unlink(t.id, d)))] : null,
           kids.length ? [h("div", { class: "rel-label" }, "Blocks"), kids.map((k) => depRow(k.id))] : null)
           : h("div", { class: "empty-line" }, "None yet.")),
+      termSection(t),
       h("section", { class: "p-sec" },
         h("div", { class: "section-head" }, top && top === last && earlier.length ? "Earlier notes" : "Notes", earlier.length ? h("span", { class: "count" }, earlier.length) : null),
         earlier.length ? h("div", { class: "notes" }, earlier.map((n) => noteEl(t, n, ro)))
@@ -5721,6 +5764,249 @@ function unsaved() {
   return [...document.querySelectorAll("dialog :is(textarea, input[name]:not([type=checkbox]))")].some(filled);
 }
 
+// ===== Fork: terminal sessions (kanvas_agents.py) =====
+// A Kanvas with kanvas_agents.py runs programs in terminals on its computer, each for a task. The task panel lists
+// them; one at a time opens in the dock at the bottom, which lives outside the panel so board updates leave it alone.
+// Sessions outlive the page: closing the dock or the tab leaves them running.
+
+ICONS.terminal = '<path d="m5 7 5 5-5 5M12 18h7"/>';
+ICONS.pr = '<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V9a3 3 0 0 0-3-3h-4m2-2.5L10.5 6 13 8.5"/>';
+const term = { on: false, list: [], config: { merge: "manual", auto_review: true }, open: null, loading: null };
+const termEnc = new TextEncoder();
+// What a card says while an agent works on its task.
+const AGENT_VERB = { validator: "Validating", executor: "Running", reviewer: "Reviewing" };
+
+async function refreshSessions() {
+  if (store?.kind !== "server") return;
+  try {
+    const r = await fetch("api/sessions", { cache: "no-store" });
+    if (!r.ok) { if (term.on) { term.on = false; render(); } return; }
+    const body = await r.json(), was = JSON.stringify([term.on, term.list, term.config]);
+    term.on = true; term.list = body.sessions; term.config = body.config || term.config;
+    if (JSON.stringify([term.on, term.list, term.config]) !== was) sessionsChanged();
+  } catch (e) { /* offline for now: keep what we had */ }
+}
+
+function sessionsChanged() {
+  render();
+  refreshCards();
+  renderTermBar();
+}
+
+// The graph keeps its cards and fills them again only when their task changes; an agent starting or ending does not change it.
+function refreshCards() {
+  if (ui.view === "graph") for (const t of board?.tasks || []) if (cardEls.has(key(t.id))) fillCard(cardEls.get(key(t.id)), t);
+}
+
+const runningAgent = (t) => term.list.find((s) => s.running && s.role !== "shell" && same(s.task, t.id));
+
+function agentTag(t) {
+  if (!term.on) return null;
+  const s = runningAgent(t), ag = t.agent || {};
+  if (s) return h("span", { class: "agent-tag live", title: `The ${s.role} agent is working on this task` }, icon("terminal"), AGENT_VERB[s.role] || s.title);
+  if (ag.needs_validation && t.state !== "done") return h("span", { class: "agent-tag warn", title: "The reviewer asked for changes: validate the task again before it runs" }, "Revalidate");
+  if (ag.pr && t.state !== "done") return h("span", { class: "agent-tag", title: `Pull request: ${ag.pr}` }, icon("pr"), "PR");
+  return null;
+}
+
+function termSection(t) {
+  if (!term.on || store.readOnly) return null;
+  const mine = term.list.filter((s) => same(s.task, t.id));
+  const vs = vstate(t), ag = t.agent || {}, busy = runningAgent(t);
+  const act = (role, label, tip, why) => h("button", {
+    class: why ? "" : "primary", disabled: !!(why || busy), title: busy ? `The ${busy.role} agent is working on it` : why || tip,
+    onclick: () => startSession(t.id, role),
+  }, label);
+  const actions = h("div", { class: "agent-actions" },
+    act("validator", "Validate", "Check with an agent that the task is doable, and agree its description together",
+      ["proposed", "todo"].includes(t.state) ? null : "Only proposals and tasks to do are validated"),
+    act("executor", "Run", "An agent does the task on its own branch and opens a pull request",
+      ag.needs_validation ? "Validate it again first: the reviewer asked for changes" : vs === "todo" ? null : vs === "blocked" ? "Blocked by unfinished dependencies" : "Only tasks to do can run"),
+    act("reviewer", "Review", "An agent reviews the pull request, then marks the task done or sends it back",
+      t.state !== "review" ? "Only tasks in review are reviewed" : ag.pr ? null : "No pull request yet"));
+  const merge = ag.merge || term.config.merge;
+  const setMerge = (m) => commit(ops.set(t.id, { agent: { ...ag, merge: m } }, { agent: t.agent }));
+  return h("section", { class: "p-sec" },
+    h("div", { class: "section-head" }, "Agents",
+      h("button", { class: "ghost", title: "Open a shell in the project's folder", onclick: () => startSession(t.id, "shell") }, icon("terminal"), "Terminal")),
+    actions,
+    ag.needs_validation ? h("div", { class: "agent-flag" }, h("span", {}, "The reviewer asked for changes, so this task is validated again before it runs."),
+      h("button", { class: "ghost", title: "Run it without validating again", onclick: () => { const { needs_validation, ...rest } = ag; commit(ops.set(t.id, { agent: rest }, { agent: t.agent })); } }, "Skip")) : null,
+    ag.pr ? h("div", { class: "agent-line" }, h("span", { class: "rel-label" }, "Pull request"),
+      h("a", { href: ag.pr, target: "_blank", rel: "noopener noreferrer", title: ag.pr }, icon("pr"), ag.pr.replace(/^https?:\/\/(www\.)?github\.com\//, ""))) : null,
+    h("div", { class: "agent-line" }, h("span", { class: "rel-label", title: "What happens to the pull request when the reviewer approves it" }, "On approval"),
+      h("div", { class: "seg", role: "group", "aria-label": "On approval" },
+        h("button", { class: merge === "manual" ? "on" : "", "aria-pressed": String(merge === "manual"), title: "The pull request waits for you to merge it", onclick: () => setMerge("manual") }, "I merge"),
+        h("button", { class: merge === "auto" ? "on" : "", "aria-pressed": String(merge === "auto"), title: "The reviewer merges the pull request", onclick: () => setMerge("auto") }, "Auto-merge"))),
+    mine.length ? h("div", { class: "sessions" }, mine.map(sessionRow)) : null);
+}
+
+function sessionRow(s) {
+  const when = s.running ? `started ${ago(s.started)}` : `${s.exit < 0 ? "stopped" : `exit ${s.exit}`} · ended ${ago(s.ended)}`;
+  return h("div", { class: `sess-row${term.open?.id === s.id ? " open" : ""}` },
+    h("span", { class: `sess-dot${s.running ? " on" : ""}`, title: s.running ? "Running" : "Ended" }),
+    h("button", { class: "ghost sess-open", title: "Open in the terminal", onclick: () => openTerminal(s.id) }, icon("terminal"), s.title, h("span", { class: "hint" }, when)),
+    s.running ? h("button", { class: "ghost", title: "End the program; its output stays here", onclick: () => stopSession(s.id) }, "Stop")
+      : h("button", { class: "ghost", title: "Forget this session and its output", onclick: () => removeSession(s.id) }, "Remove"));
+}
+
+async function startSession(task, role) {
+  const size = term.open ? { cols: term.open.xt.cols, rows: term.open.xt.rows } : { cols: 120, rows: 32 };
+  try {
+    const r = await fetch("api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ task, role, ...size }) });
+    const body = await r.json();
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    term.list = [...term.list, body];
+    sessionsChanged();
+    openTerminal(body.id);
+  } catch (e) { toast(`Could not start the terminal: ${e.message}`, "error"); }
+}
+
+async function sessionCall(method, path, what) {
+  try {
+    const r = await fetch(`api/sessions/${path}`, { method, headers: { "Content-Type": "application/json" }, body: method === "POST" ? "{}" : undefined });
+    if (!r.ok && r.status !== 404) throw new Error((await r.json()).error || r.statusText);
+    return true;
+  } catch (e) { toast(`Could not ${what} the session: ${e.message}`, "error"); return false; }
+}
+
+// Ends the program; the session and its output stay until removed.
+async function stopSession(id) {
+  if (await sessionCall("POST", `${encodeURIComponent(id)}/stop`, "stop")) refreshSessions();
+}
+
+async function removeSession(id) {
+  if (term.open?.id === id) closeTerminal();
+  if (!(await sessionCall("DELETE", encodeURIComponent(id), "remove"))) return;
+  term.list = term.list.filter((s) => s.id !== id);
+  sessionsChanged();
+  refreshSessions();
+}
+
+function loadXterm() {
+  const add = (src) => new Promise((ok, fail) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => fail(new Error(`${src} did not load`)); document.head.append(s); });
+  term.loading ||= (() => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "/api/vendor/xterm.css";
+    document.head.append(css);
+    return add("/api/vendor/xterm.js").then(() => add("/api/vendor/addon-fit.js"));
+  })().catch((e) => { term.loading = null; throw e; });
+  return term.loading;
+}
+
+function termDock() {
+  let el = $("#term-dock");
+  if (el) return el;
+  el = h("div", { id: "term-dock", hidden: true, role: "region", "aria-label": "Terminal" },
+    h("div", { class: "term-grip", title: "Drag to resize" }),
+    h("div", { class: "term-bar" }, h("span", { class: "term-title" }), h("span", { class: "spacer" }),
+      h("button", { class: "ghost term-stop" }),
+      h("button", { class: "ghost icon-btn", title: "Close (the program keeps running)", "aria-label": "Close the terminal", onclick: closeTerminal }, icon("x"))),
+    h("div", { class: "term-screen" }));
+  // Keys typed in the terminal belong to its program (Escape, Ctrl+Z, /), not to the board's shortcuts.
+  el.addEventListener("keydown", (e) => e.stopPropagation());
+  const grip = el.querySelector(".term-grip");
+  grip.addEventListener("pointerdown", (e) => {
+    grip.setPointerCapture(e.pointerId);
+    const move = (ev) => document.documentElement.style.setProperty("--term-h", `${Math.max(140, innerHeight - ev.clientY)}px`);
+    const up = () => { grip.removeEventListener("pointermove", move); grip.removeEventListener("pointerup", up); };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+  });
+  document.body.append(el);
+  return el;
+}
+
+async function openTerminal(id) {
+  if (term.open?.id === id) { term.open.xt.focus(); return; }
+  try { await loadXterm(); } catch (e) { toast(`Could not load the terminal: ${e.message}`, "error"); return; }
+  closeTerminal();
+  const el = termDock(), screen = el.querySelector(".term-screen");
+  el.hidden = false;
+  document.body.classList.add("term-open");
+  screen.replaceChildren();
+  const xt = new Terminal({
+    cursorBlink: true, fontSize: 13, scrollback: 5000, allowProposedApi: false,
+    fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--mono").trim() || "monospace",
+    theme: { background: "#0d0f14", foreground: "#e6e8ec", cursor: "#e6e8ec", selectionBackground: "#3a4150" },
+  });
+  const fit = new FitAddon.FitAddon();
+  xt.loadAddon(fit);
+  xt.open(screen);
+  const o = term.open = { id, xt, fit, ws: null, ended: false, closing: false };
+  const refit = () => { try { fit.fit(); } catch (e) { /* hidden for now */ } };
+  o.observer = new ResizeObserver(refit);
+  o.observer.observe(screen);
+  refit();
+  xt.onData((d) => termSend(o, termEnc.encode(d)));
+  xt.onBinary((d) => termSend(o, Uint8Array.from(d, (c) => c.charCodeAt(0))));
+  xt.onResize(({ cols, rows }) => termSend(o, JSON.stringify({ t: "r", c: cols, r: rows })));
+  termConnect(o);
+  renderTermBar();
+  renderPanel();
+  xt.focus();
+}
+
+function termConnect(o) {
+  const url = new URL(`api/sessions/${encodeURIComponent(o.id)}/socket`, location.href);
+  url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const ws = o.ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
+  // The server replays the session's output on every connection, so the screen starts clean each time.
+  ws.onopen = () => { o.xt.reset(); termSend(o, JSON.stringify({ t: "r", c: o.xt.cols, r: o.xt.rows })); };
+  ws.onmessage = (e) => {
+    if (typeof e.data !== "string") { o.xt.write(new Uint8Array(e.data)); return; }
+    const m = JSON.parse(e.data);
+    if (m.t === "exit") {
+      o.ended = true;
+      o.xt.write(`\r\n\x1b[2m[${exitText(m.code)}]\x1b[0m\r\n`);
+      renderTermBar();
+      refreshSessions();
+    }
+  };
+  ws.onclose = () => {
+    if (term.open !== o || o.ended || o.closing) return;
+    // The server restarted or the network dropped: try again while the dock still shows this session.
+    setTimeout(() => { if (term.open === o && !o.closing) termConnect(o); }, 1500);
+  };
+}
+
+// Python reports a program ended by a signal as minus the signal's number.
+const exitText = (code) => (code < 0 ? "Stopped" : `The program ended with exit code ${code}`);
+
+function termSend(o, data) {
+  if (o.ws?.readyState === WebSocket.OPEN) o.ws.send(data);
+}
+
+function closeTerminal() {
+  const o = term.open;
+  if (!o) return;
+  o.closing = true;
+  o.ws?.close();
+  o.observer.disconnect();
+  o.xt.dispose();
+  term.open = null;
+  $("#term-dock").hidden = true;
+  document.body.classList.remove("term-open");
+  renderPanel();
+}
+
+function renderTermBar() {
+  const el = $("#term-dock"), o = term.open;
+  if (!el || !o) return;
+  const s = term.list.find((x) => x.id === o.id);
+  const running = s ? s.running : !o.ended;
+  el.querySelector(".term-title").replaceChildren(...compact(
+    h("span", { class: `sess-dot${running ? " on" : ""}` }),
+    s?.task ? h("a", { class: "tref", href: `#${s.task}`, onclick: (e) => { e.preventDefault(); select(s.task); } }, s.task) : null,
+    h("span", {}, s?.title || "Terminal"),
+    h("span", { class: "hint" }, running ? "running" : "ended")));
+  const stop = el.querySelector(".term-stop");
+  stop.textContent = running ? "Stop" : "Remove";
+  stop.title = running ? "End the program; its output stays here" : "Forget this session and its output";
+  stop.onclick = () => (running ? stopSession(o.id) : removeSession(o.id));
+}
+
 async function boot() {
   setupChrome();
   // Browsers show their own message, and only to a page the human has interacted with.
@@ -5736,7 +6022,20 @@ async function boot() {
   poll();
   refreshBoards().then(watchOthers);
   setInterval(() => { if (document.visibilityState === "visible") refreshBoards(); }, 5000);
-  addEventListener("focus", refreshBoards);}
+  addEventListener("focus", refreshBoards);
+  watchSessions();
+}
+
+// Fork: polls the sessions only where Kanvas runs them (kanvas_agents.py on Linux), so other servers see no requests.
+async function watchSessions() {
+  if (store?.kind !== "server") return;
+  try {
+    const info = await (await fetch("/api/boards", { cache: "no-store" })).json();
+    if (!info.agents) return;
+  } catch (e) { return; }
+  refreshSessions();
+  setInterval(() => { if (document.visibilityState === "visible") refreshSessions(); }, 3000);
+}
 
 boot();
 })();
