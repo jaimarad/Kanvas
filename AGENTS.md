@@ -20,7 +20,10 @@ It deliberately departs from the upstream rules below, and only in these ways:
 | `kanvas.py` | CLI, board model, local server, `init` / `import` / `export`. Python 3.8+, standard library only |
 | `kanvas.html` | The whole browser board in one file: CSS, markup and JavaScript, no build step |
 | `skill/SKILL.md` | Agent skill that `init` installs into projects |
-| `kanvas_agents.py` | Fork: terminal sessions in a pty, their HTTP routes and the WebSocket the browser attaches with. Loaded by `kanvas.py` on POSIX only (`AGENTS`) |
+| `kanvas_agents.py` | Fork: terminal sessions in a pty, their HTTP routes and the WebSocket the browser attaches with; the validator, executor and reviewer (prompts, worktrees, the hand-off to review) and their CLI commands `validate`, `pr` and `verdict`. Loaded by `kanvas.py` on POSIX only (`AGENTS`), which sets its `K` to `kanvas.py` |
+| `agents/` | Fork: the default prompts, copied into a project's `.kanvas/agents/` the first time each agent runs |
+| `FORK.md` | Fork: the user guide to the agents, local Docker and the VPS |
+| `deploy/` | Fork: the VPS setup, Kanvas behind `tailscale serve` with no published port |
 | `vendor/` | Fork: xterm.js, served at `/api/vendor/<name>`; versions in `vendor/README.md` |
 | `tests/test_agents.py` | Fork: tests for `kanvas_agents.py`; they skip without a pty, so run them in Docker |
 | `Dockerfile`, `docker-compose.yml` | Fork: the Linux environment for developing and deploying the agent features |

@@ -17,10 +17,12 @@ USER kanvas
 WORKDIR /home/kanvas
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-# Logins live in volumes so they survive rebuilds: Claude Code's in CLAUDE_CONFIG_DIR, gh's in GH_CONFIG_DIR.
+# Logins live in volumes so they survive rebuilds: Claude Code's in CLAUDE_CONFIG_DIR, gh's in GH_CONFIG_DIR,
+# and git's settings (identity, `gh auth setup-git`) in GIT_CONFIG_GLOBAL.
 ENV PATH="/home/kanvas/.local/bin:${PATH}" \
     CLAUDE_CONFIG_DIR=/home/kanvas/auth/claude \
     GH_CONFIG_DIR=/home/kanvas/auth/gh \
+    GIT_CONFIG_GLOBAL=/home/kanvas/auth/gitconfig \
     KANVAS_STATE_DIR=/home/kanvas/auth/kanvas \
     KANVAS_TEST_CHROME=chromium
 
