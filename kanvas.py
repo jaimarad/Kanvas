@@ -68,6 +68,7 @@ def _load_agents():
     spec = importlib.util.spec_from_file_location("kanvas_agents", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    module.K = sys.modules[__name__]
     return module
 
 
@@ -2145,7 +2146,8 @@ class BoardHandler(BaseHTTPRequestHandler):
                 body += "<p><small>Run <code>kanvas serve</code> in a project to open its board here.</small></p>"
             return self._send(200, page("Kanvas", body), "text/html; charset=utf-8")
         if parts == ["api", "boards"]:
-            info = {"kanvas": VERSION, "boards": self._board_list()}
+            # Fork: "agents" tells the page whether this Kanvas runs terminal sessions and agents.
+            info = {"kanvas": VERSION, "boards": self._board_list(), "agents": bool(self.server.sessions)}
             return self._send(200, json.dumps(info, ensure_ascii=False).encode("utf-8"))
         if AGENTS and len(parts) == 3 and parts[:2] == ["api", "vendor"]:
             return AGENTS.handle_vendor(self, parts[2])
@@ -2809,6 +2811,8 @@ def build_parser():
     p.add_argument("--force", action="store_true", help="replace an existing board that has tasks")
     p = add("export", cmd_export, "write a read-only HTML snapshot to share")
     p.add_argument("output", nargs="?", default="kanvas-snapshot.html")
+    if AGENTS:  # Fork: validate, pr and verdict, for the agents the board starts.
+        AGENTS.add_commands(add, text_sources)
     return parser
 
 

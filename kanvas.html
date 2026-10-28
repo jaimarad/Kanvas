@@ -749,6 +749,24 @@ dialog.dlg[open]:has(> form > .help) { display: flex; flex-direction: column; }
 .sess-row.open .sess-open { background: var(--surface-2); }
 .sess-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--blocked); }
 .sess-dot.on { background: var(--done); box-shadow: 0 0 0 3px color-mix(in srgb, var(--done) 22%, transparent); }
+.agent-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.agent-actions button { flex: 1; justify-content: center; }
+.agent-line { display: flex; align-items: center; gap: 10px; min-height: 28px; font-size: 13px; }
+.agent-line .rel-label { flex: none; width: 92px; margin: 0; }
+.agent-line a { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); }
+.agent-flag { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 6px; font-size: 12.5px;
+  background: color-mix(in srgb, var(--review) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--review) 40%, var(--border)); }
+.agent-flag span { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 3px 10px; font-size: 12.5px; background: transparent; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button.on { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.agent-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); white-space: nowrap; }
+.agent-tag .icon svg { width: 11px; height: 11px; }
+.agent-tag.live { color: var(--doing); border-color: color-mix(in srgb, var(--doing) 50%, var(--border)); animation: agent-pulse 1.6s ease-in-out infinite; }
+.agent-tag.warn { color: var(--review); border-color: color-mix(in srgb, var(--review) 50%, var(--border)); }
+@keyframes agent-pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .agent-tag.live { animation: none; } }
 #term-dock { --term-bg: #0d0f14; position: fixed; left: 0; right: 0; bottom: 0; height: var(--term-h, 45vh); min-height: 140px; max-height: calc(100dvh - 48px);
   z-index: 20; display: flex; flex-direction: column; background: var(--term-bg); border-top: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); }
 #term-dock[hidden] { display: none; }
@@ -2759,7 +2777,7 @@ function fillCard(el, t) {
   el.setAttribute("role", "option");
   el.setAttribute("aria-label", cardLabel(t, vs, unmet(t)));
   el.replaceChildren(...compact(
-    h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, yoloTag(t), h("span", { class: "badge" }, asking ? "Waiting for you" : LABEL[vs]))),
+    h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, agentTag(t), yoloTag(t), h("span", { class: "badge" }, asking ? "Waiting for you" : LABEL[vs]))),
     h("div", { class: "card-title", title: t.title }, t.title),
     cardFoot(t),
     store.readOnly ? null : h("div", { class: "handle in", title: "Drag onto another card: this card will depend on that one" }),
@@ -3537,7 +3555,7 @@ function kanbanCard(t) {
     role: "option", "aria-label": cardLabel(t, vs, unmet(t)),
     onclick: (e) => (picking ? pickToggle(t.id) : multiClick(e) ? toggleMulti(t.id) : select(t.id)),
   },
-  h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, yoloTag(t),
+  h("div", { class: "card-head" }, h("span", { class: "cid" }, t.id), h("span", { class: "head-end" }, agentTag(t), yoloTag(t),
     asking ? h("span", { class: "badge" }, "Waiting for you") : null,
     g ? h("span", { class: "gchip", title: g.name }, groupTag(groupColor(g)), h("span", {}, g.name)) : null)),
   h("div", { class: "card-title" }, t.title),
@@ -5565,27 +5583,75 @@ function unsaved() {
 // Sessions outlive the page: closing the dock or the tab leaves them running.
 
 ICONS.terminal = '<path d="m5 7 5 5-5 5M12 18h7"/>';
-const term = { on: false, list: [], roles: {}, open: null, loading: null };
+ICONS.pr = '<circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V9a3 3 0 0 0-3-3h-4m2-2.5L10.5 6 13 8.5"/>';
+const term = { on: false, list: [], config: { merge: "manual", auto_review: true }, open: null, loading: null };
 const termEnc = new TextEncoder();
+// What a card says while an agent works on its task.
+const AGENT_VERB = { validator: "Validating", executor: "Running", reviewer: "Reviewing" };
 
 async function refreshSessions() {
   if (store?.kind !== "server") return;
   try {
     const r = await fetch("api/sessions", { cache: "no-store" });
-    if (!r.ok) { if (term.on) { term.on = false; renderPanel(); } return; }
-    const body = await r.json(), was = JSON.stringify([term.on, term.list]);
-    term.on = true; term.list = body.sessions; term.roles = body.roles;
-    if (JSON.stringify([term.on, term.list]) !== was) { renderPanel(); renderTermBar(); }
+    if (!r.ok) { if (term.on) { term.on = false; render(); } return; }
+    const body = await r.json(), was = JSON.stringify([term.on, term.list, term.config]);
+    term.on = true; term.list = body.sessions; term.config = body.config || term.config;
+    if (JSON.stringify([term.on, term.list, term.config]) !== was) sessionsChanged();
   } catch (e) { /* offline for now: keep what we had */ }
+}
+
+function sessionsChanged() {
+  render();
+  refreshCards();
+  renderTermBar();
+}
+
+// The graph keeps its cards and fills them again only when their task changes; an agent starting or ending does not change it.
+function refreshCards() {
+  if (ui.view === "graph") for (const t of board?.tasks || []) if (cardEls.has(key(t.id))) fillCard(cardEls.get(key(t.id)), t);
+}
+
+const runningAgent = (t) => term.list.find((s) => s.running && s.role !== "shell" && same(s.task, t.id));
+
+function agentTag(t) {
+  if (!term.on) return null;
+  const s = runningAgent(t), ag = t.agent || {};
+  if (s) return h("span", { class: "agent-tag live", title: `The ${s.role} agent is working on this task` }, icon("terminal"), AGENT_VERB[s.role] || s.title);
+  if (ag.needs_validation && t.state !== "done") return h("span", { class: "agent-tag warn", title: "The reviewer asked for changes: validate the task again before it runs" }, "Revalidate");
+  if (ag.pr && t.state !== "done") return h("span", { class: "agent-tag", title: `Pull request: ${ag.pr}` }, icon("pr"), "PR");
+  return null;
 }
 
 function termSection(t) {
   if (!term.on || store.readOnly) return null;
   const mine = term.list.filter((s) => same(s.task, t.id));
+  const vs = vstate(t), ag = t.agent || {}, busy = runningAgent(t);
+  const act = (role, label, tip, why) => h("button", {
+    class: why ? "" : "primary", disabled: !!(why || busy), title: busy ? `The ${busy.role} agent is working on it` : why || tip,
+    onclick: () => startSession(t.id, role),
+  }, label);
+  const actions = h("div", { class: "agent-actions" },
+    act("validator", "Validate", "Check with an agent that the task is doable, and agree its description together",
+      ["proposed", "todo"].includes(t.state) ? null : "Only proposals and tasks to do are validated"),
+    act("executor", "Run", "An agent does the task on its own branch and opens a pull request",
+      ag.needs_validation ? "Validate it again first: the reviewer asked for changes" : vs === "todo" ? null : vs === "blocked" ? "Blocked by unfinished dependencies" : "Only tasks to do can run"),
+    act("reviewer", "Review", "An agent reviews the pull request, then marks the task done or sends it back",
+      t.state !== "review" ? "Only tasks in review are reviewed" : ag.pr ? null : "No pull request yet"));
+  const merge = ag.merge || term.config.merge;
+  const setMerge = (m) => commit(ops.set(t.id, { agent: { ...ag, merge: m } }, { agent: t.agent }));
   return h("section", { class: "p-sec" },
-    h("div", { class: "section-head" }, "Terminal",
-      h("button", { class: "ghost", title: "Open a shell in the project's folder", onclick: () => startSession(t.id, "shell") }, icon("plus"), "New")),
-    mine.length ? h("div", { class: "sessions" }, mine.map(sessionRow)) : h("div", { class: "empty-line" }, "No sessions yet."));
+    h("div", { class: "section-head" }, "Agents",
+      h("button", { class: "ghost", title: "Open a shell in the project's folder", onclick: () => startSession(t.id, "shell") }, icon("terminal"), "Terminal")),
+    actions,
+    ag.needs_validation ? h("div", { class: "agent-flag" }, h("span", {}, "The reviewer asked for changes, so this task is validated again before it runs."),
+      h("button", { class: "ghost", title: "Run it without validating again", onclick: () => { const { needs_validation, ...rest } = ag; commit(ops.set(t.id, { agent: rest }, { agent: t.agent })); } }, "Skip")) : null,
+    ag.pr ? h("div", { class: "agent-line" }, h("span", { class: "rel-label" }, "Pull request"),
+      h("a", { href: ag.pr, target: "_blank", rel: "noopener noreferrer", title: ag.pr }, icon("pr"), ag.pr.replace(/^https?:\/\/(www\.)?github\.com\//, ""))) : null,
+    h("div", { class: "agent-line" }, h("span", { class: "rel-label", title: "What happens to the pull request when the reviewer approves it" }, "On approval"),
+      h("div", { class: "seg", role: "group", "aria-label": "On approval" },
+        h("button", { class: merge === "manual" ? "on" : "", "aria-pressed": String(merge === "manual"), title: "The pull request waits for you to merge it", onclick: () => setMerge("manual") }, "I merge"),
+        h("button", { class: merge === "auto" ? "on" : "", "aria-pressed": String(merge === "auto"), title: "The reviewer merges the pull request", onclick: () => setMerge("auto") }, "Auto-merge"))),
+    mine.length ? h("div", { class: "sessions" }, mine.map(sessionRow)) : null);
 }
 
 function sessionRow(s) {
@@ -5604,7 +5670,7 @@ async function startSession(task, role) {
     const body = await r.json();
     if (!r.ok) throw new Error(body.error || r.statusText);
     term.list = [...term.list, body];
-    renderPanel();
+    sessionsChanged();
     openTerminal(body.id);
   } catch (e) { toast(`Could not start the terminal: ${e.message}`, "error"); }
 }
@@ -5626,7 +5692,7 @@ async function removeSession(id) {
   if (term.open?.id === id) closeTerminal();
   if (!(await sessionCall("DELETE", encodeURIComponent(id), "remove"))) return;
   term.list = term.list.filter((s) => s.id !== id);
-  renderPanel();
+  sessionsChanged();
   refreshSessions();
 }
 
@@ -5770,7 +5836,16 @@ async function boot() {
   refreshBoards().then(watchOthers);
   setInterval(() => { if (document.visibilityState === "visible") refreshBoards(); }, 5000);
   addEventListener("focus", refreshBoards);
-  // Fork: terminal sessions.
+  watchSessions();
+}
+
+// Fork: polls the sessions only where Kanvas runs them (kanvas_agents.py on Linux), so other servers see no requests.
+async function watchSessions() {
+  if (store?.kind !== "server") return;
+  try {
+    const info = await (await fetch("/api/boards", { cache: "no-store" })).json();
+    if (!info.agents) return;
+  } catch (e) { return; }
   refreshSessions();
   setInterval(() => { if (document.visibilityState === "visible") refreshSessions(); }, 3000);
 }

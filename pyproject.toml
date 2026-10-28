@@ -67,6 +67,7 @@ bypass-selection = true
 # Fork: terminal sessions and their vendored browser code, next to kanvas.py as well.
 "kanvas_agents.py" = "kanvas_board/kanvas_agents.py"
 "vendor/xterm" = "kanvas_board/vendor/xterm"
+"agents" = "kanvas_board/agents"
 
 [tool.hatch.build.targets.sdist]
-include = ["/kanvas.py", "/kanvas.html", "/skill/SKILL.md", "/README.md", "/LICENSE", "/CHANGELOG.md", "/kanvas_agents.py", "/vendor/xterm"]
+include = ["/kanvas.py", "/kanvas.html", "/skill/SKILL.md", "/README.md", "/LICENSE", "/CHANGELOG.md", "/kanvas_agents.py", "/vendor/xterm", "/agents"]
